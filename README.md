@@ -31,7 +31,7 @@ Antes de ejecutar el script, asegúrate de:
 
 5. **Dar permisos de ejecución al script:**
     ```bash
-    chmod +x arch-installer.sh
+    chmod +x archinstallmx
     ```
 
 6. **Entrar al directorio del repositorio:**

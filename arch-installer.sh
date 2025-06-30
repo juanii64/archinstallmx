@@ -2,9 +2,8 @@
 set -e
 
 echo "========== INSTALADOR DE ARCH LINUX =========="
-echo
 
-# Función para pausar
+# Pausa
 pause() {
   read -rp "Presiona Enter para continuar..."
 }
@@ -14,19 +13,29 @@ echo "[1] Discos disponibles:"
 lsblk -dpno NAME,SIZE | grep -v "loop"
 read -rp "Selecciona el disco (ej. /dev/sda o /dev/nvme0n1): " DISK
 
-# Modo de instalación
-echo "[2] ¿Qué modo de arranque deseas usar?"
-select BOOTMODE in "UEFI" "MBR"; do
-  [[ $BOOTMODE ]] && break
-done
+# Modo de arranque
+echo "[2] Selecciona el tipo de instalación:"
+echo "1) UEFI"
+echo "2) MBR (BIOS)"
+read -rp "Opción: " bootopt
+if [[ "$bootopt" == "1" ]]; then
+  BOOTMODE="UEFI"
+else
+  BOOTMODE="MBR"
+fi
 
 # ¿Partición /home?
-echo "[3] ¿Deseas crear una partición /home separada?"
-select HOMEPART in "Sí" "No"; do
-  [[ $HOMEPART ]] && break
-done
+echo "[3] ¿Deseas partición /home separada?"
+echo "1) Sí"
+echo "2) No"
+read -rp "Opción: " homeopt
+if [[ "$homeopt" == "1" ]]; then
+  HOMEPART="Sí"
+else
+  HOMEPART="No"
+fi
 
-# Hostname, usuario y contraseñas
+# Hostname y usuarios
 read -rp "[4] Nombre del sistema (hostname): " HOSTNAME
 read -rp "[5] Nombre del usuario: " USERNAME
 read -rsp "[6] Contraseña para $USERNAME: " USERPASS; echo
@@ -34,12 +43,12 @@ read -rsp "[7] Contraseña para root: " ROOTPASS; echo
 
 # Confirmación
 echo
-echo "[⚠️] ¡Se formateará el disco completo: $DISK!"
-read -rp "¿Deseas continuar? (y/N): " CONFIRM
+echo "[⚠️] ¡Se eliminará TODO el contenido de $DISK!"
+read -rp "¿Continuar? (y/N): " CONFIRM
 [[ $CONFIRM != "y" ]] && exit 1
 
-# Limpiar y crear tabla
-echo "[8] Limpiando tabla de particiones..."
+# Borrar disco
+echo "[8] Limpiando y creando tabla de particiones..."
 wipefs -af "$DISK"
 sgdisk -Zo "$DISK"
 
@@ -53,25 +62,25 @@ fi
 PART_COUNT=1
 
 if [[ $BOOTMODE == "UEFI" ]]; then
-  read -rp "Tamaño para /boot/efi (ej. 512MiB, default): " EFISIZE
-  EFISIZE=${EFISIZE:-512MiB}
-  parted "$DISK" --script mkpart primary fat32 1MiB "$EFISIZE"
+  echo "[9] Creando partición EFI de 1GiB..."
+  parted "$DISK" --script mkpart primary fat32 1MiB 1025MiB
   parted "$DISK" --script set ${PART_COUNT} esp on
   BOOT="${DISK}${PART_COUNT}"
   ((PART_COUNT++))
-  EFI_END="$EFISIZE"
+  ROOT_START="1025MiB"
 else
-  EFI_END="1MiB"
+  ROOT_START="1MiB"
 fi
 
-read -rp "Tamaño para la raíz / (ej. 20G). Deja vacío o 0 para usar el resto: " ROOTSIZE
-if [[ $ROOTSIZE == "" || $ROOTSIZE == "0" ]]; then
+echo "[10] ¿Tamaño para raíz (/) en GiB? (0 para usar el resto): "
+read -rp "Tamaño (ej. 20): " ROOTSIZE
+if [[ "$ROOTSIZE" == "0" || "$ROOTSIZE" == "" ]]; then
   ROOT_END="100%"
 else
-  ROOT_END="${ROOTSIZE}GiB"
+  ROOT_END="$((1025 + ROOTSIZE))MiB"
 fi
 
-parted "$DISK" --script mkpart primary ext4 "$EFI_END" "$ROOT_END"
+parted "$DISK" --script mkpart primary ext4 "$ROOT_START" "$ROOT_END"
 ROOT="${DISK}${PART_COUNT}"
 ((PART_COUNT++))
 
@@ -83,8 +92,8 @@ fi
 sync
 sleep 1
 
-# Formatear y montar
-echo "[9] Formateando y montando particiones..."
+# Formateo y montaje
+echo "[11] Formateando particiones..."
 mkfs.ext4 "$ROOT"
 mount "$ROOT" /mnt
 
@@ -96,20 +105,20 @@ fi
 
 if [[ $HOMEPART == "Sí" ]]; then
   mkfs.ext4 "$HOME"
-  mkdir -p /mnt/home
+  mkdir /mnt/home
   mount "$HOME" /mnt/home
 fi
 
-# Instalar base
-echo "[10] Instalando el sistema base..."
-pacstrap /mnt base linux linux-firmware nano sudo networkmanager grub
+# Instalación base
+echo "[12] Instalando sistema base..."
+pacstrap /mnt base linux linux-firmware networkmanager nano sudo grub
 
 # Fstab
-echo "[11] Generando fstab..."
+echo "[13] Generando fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
 
-# Configurar dentro de chroot
-echo "[12] Configurando el sistema dentro de chroot..."
+# Configuración del sistema
+echo "[14] Configurando Arch Linux dentro de chroot..."
 
 arch-chroot /mnt /bin/bash <<EOF
 ln -sf /usr/share/zoneinfo/America/Mexico_City /etc/localtime
@@ -144,8 +153,6 @@ grub-mkconfig -o /boot/grub/grub.cfg
 EOF
 
 # Finalizar
-echo "[✅] Instalación completada exitosamente."
-echo "Desmontando particiones..."
+echo "[✅] Instalación completada."
 umount -R /mnt
-
-echo "Ya puedes reiniciar. ¡Bienvenido a Arch Linux!"
+echo "Ya puedes reiniciar el sistema. ¡Disfruta Arch Linux!"

@@ -50,15 +50,15 @@ mount "$ROOT" /mnt
 mkdir -p /mnt/boot/efi
 mount "$BOOT" /mnt/boot/efi
 
-# Instalación base
+# Instalación base con efibootmgr
 echo "[10] Instalando el sistema base..."
-pacstrap /mnt base linux linux-firmware nano sudo networkmanager grub
+pacstrap /mnt base linux linux-firmware nano sudo networkmanager grub efibootmgr
 
 # Fstab
 genfstab -U /mnt >> /mnt/etc/fstab
 
 # Configuración del sistema
-echo "[11] Configurando sistema dentro del nuevo entorno..."
+echo "[11] Configurando el sistema dentro del nuevo entorno..."
 
 arch-chroot /mnt /bin/bash <<EOF
 ln -sf /usr/share/zoneinfo/America/Mexico_City /etc/localtime
@@ -84,7 +84,12 @@ sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 
 systemctl enable NetworkManager
 
-grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB
+grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB --recheck
+
+# Fallback para mayor compatibilidad con UEFI
+mkdir -p /boot/efi/EFI/boot
+cp /boot/efi/EFI/GRUB/grubx64.efi /boot/efi/EFI/boot/bootx64.efi
+
 grub-mkconfig -o /boot/grub/grub.cfg
 EOF
 

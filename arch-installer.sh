@@ -1,132 +1,73 @@
 #!/bin/bash
 set -e
 
-echo "========== INSTALADOR DE ARCH LINUX =========="
+echo "========== INSTALADOR DE ARCH LINUX (UEFI / sin /home / español MX) =========="
 
-# Pausa
-pause() {
-  read -rp "Presiona Enter para continuar..."
-}
-
-# Mostrar discos
+# Mostrar discos como menú numerado
 echo "[1] Discos disponibles:"
-lsblk -dpno NAME,SIZE | grep -v "loop"
-read -rp "Selecciona el disco (ej. /dev/sda o /dev/nvme0n1): " DISK
+DISKS=($(lsblk -dpno NAME | grep -v "loop"))
+for i in "${!DISKS[@]}"; do
+  SIZE=$(lsblk -dn -o SIZE "${DISKS[$i]}")
+  echo "$((i+1))) ${DISKS[$i]} ($SIZE)"
+done
 
-# Modo de arranque
-echo "[2] Selecciona el tipo de instalación:"
-echo "1) UEFI"
-echo "2) MBR (BIOS)"
-read -rp "Opción: " bootopt
-if [[ "$bootopt" == "1" ]]; then
-  BOOTMODE="UEFI"
-else
-  BOOTMODE="MBR"
-fi
-
-# ¿Partición /home?
-echo "[3] ¿Deseas partición /home separada?"
-echo "1) Sí"
-echo "2) No"
-read -rp "Opción: " homeopt
-if [[ "$homeopt" == "1" ]]; then
-  HOMEPART="Sí"
-else
-  HOMEPART="No"
-fi
-
-# Hostname y usuarios
-read -rp "[4] Nombre del sistema (hostname): " HOSTNAME
-read -rp "[5] Nombre del usuario: " USERNAME
-read -rsp "[6] Contraseña para $USERNAME: " USERPASS; echo
-read -rsp "[7] Contraseña para root: " ROOTPASS; echo
+read -rp "Selecciona el disco (número): " DISK_INDEX
+DISK="${DISKS[$((DISK_INDEX-1))]}"
 
 # Confirmación
-echo
-echo "[⚠️] ¡Se eliminará TODO el contenido de $DISK!"
-read -rp "¿Continuar? (y/N): " CONFIRM
+echo "[⚠️] Se eliminarán TODOS los datos en: $DISK"
+read -rp "¿Deseas continuar? (y/N): " CONFIRM
 [[ $CONFIRM != "y" ]] && exit 1
 
-# Borrar disco
-echo "[8] Limpiando y creando tabla de particiones..."
+# Hostname y usuarios
+read -rp "[2] Nombre del sistema (hostname): " HOSTNAME
+read -rp "[3] Nombre del usuario: " USERNAME
+read -rsp "[4] Contraseña para $USERNAME: " USERPASS; echo
+read -rsp "[5] Contraseña para root: " ROOTPASS; echo
+
+# Limpieza y particionado
+echo "[6] Borrando disco y creando tabla GPT..."
 wipefs -af "$DISK"
 sgdisk -Zo "$DISK"
+parted "$DISK" --script mklabel gpt
 
-if [[ $BOOTMODE == "UEFI" ]]; then
-  parted "$DISK" --script mklabel gpt
-else
-  parted "$DISK" --script mklabel msdos
-fi
+# Particiones
+echo "[7] Creando partición EFI (1GiB) y raíz (/)..."
+parted "$DISK" --script mkpart primary fat32 1MiB 1025MiB
+parted "$DISK" --script set 1 esp on
+parted "$DISK" --script mkpart primary ext4 1025MiB 100%
 
-# Crear particiones
-PART_COUNT=1
+BOOT="${DISK}1"
+ROOT="${DISK}2"
 
-if [[ $BOOTMODE == "UEFI" ]]; then
-  echo "[9] Creando partición EFI de 1GiB..."
-  parted "$DISK" --script mkpart primary fat32 1MiB 1025MiB
-  parted "$DISK" --script set ${PART_COUNT} esp on
-  BOOT="${DISK}${PART_COUNT}"
-  ((PART_COUNT++))
-  ROOT_START="1025MiB"
-else
-  ROOT_START="1MiB"
-fi
-
-echo "[10] ¿Tamaño para raíz (/) en GiB? (0 para usar el resto): "
-read -rp "Tamaño (ej. 20): " ROOTSIZE
-if [[ "$ROOTSIZE" == "0" || "$ROOTSIZE" == "" ]]; then
-  ROOT_END="100%"
-else
-  ROOT_END="$((1025 + ROOTSIZE))MiB"
-fi
-
-parted "$DISK" --script mkpart primary ext4 "$ROOT_START" "$ROOT_END"
-ROOT="${DISK}${PART_COUNT}"
-((PART_COUNT++))
-
-if [[ $HOMEPART == "Sí" ]]; then
-  parted "$DISK" --script mkpart primary ext4 "$ROOT_END" 100%
-  HOME="${DISK}${PART_COUNT}"
-fi
-
-sync
-sleep 1
-
-# Formateo y montaje
-echo "[11] Formateando particiones..."
+# Formatear y montar
+echo "[8] Formateando particiones..."
+mkfs.fat -F32 "$BOOT"
 mkfs.ext4 "$ROOT"
+
+echo "[9] Montando particiones..."
 mount "$ROOT" /mnt
-
-if [[ $BOOTMODE == "UEFI" ]]; then
-  mkfs.fat -F32 "$BOOT"
-  mkdir -p /mnt/boot/efi
-  mount "$BOOT" /mnt/boot/efi
-fi
-
-if [[ $HOMEPART == "Sí" ]]; then
-  mkfs.ext4 "$HOME"
-  mkdir /mnt/home
-  mount "$HOME" /mnt/home
-fi
+mkdir -p /mnt/boot/efi
+mount "$BOOT" /mnt/boot/efi
 
 # Instalación base
-echo "[12] Instalando sistema base..."
-pacstrap /mnt base linux linux-firmware networkmanager nano sudo grub
+echo "[10] Instalando el sistema base..."
+pacstrap /mnt base linux linux-firmware nano sudo networkmanager grub
 
 # Fstab
-echo "[13] Generando fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
 
 # Configuración del sistema
-echo "[14] Configurando Arch Linux dentro de chroot..."
+echo "[11] Configurando sistema dentro del nuevo entorno..."
 
 arch-chroot /mnt /bin/bash <<EOF
 ln -sf /usr/share/zoneinfo/America/Mexico_City /etc/localtime
 hwclock --systohc
 
+echo "es_MX.UTF-8 UTF-8" >> /etc/locale.gen
 echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
 locale-gen
-echo "LANG=en_US.UTF-8" > /etc/locale.conf
+echo "LANG=es_MX.UTF-8" > /etc/locale.conf
 
 echo "$HOSTNAME" > /etc/hostname
 cat > /etc/hosts <<EOL
@@ -143,16 +84,11 @@ sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 
 systemctl enable NetworkManager
 
-if [[ "$BOOTMODE" == "UEFI" ]]; then
-  grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB
-else
-  grub-install --target=i386-pc $DISK
-fi
-
+grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB
 grub-mkconfig -o /boot/grub/grub.cfg
 EOF
 
-# Finalizar
-echo "[✅] Instalación completada."
+# Final
+echo "[✅] Instalación completada con éxito."
 umount -R /mnt
-echo "Ya puedes reiniciar el sistema. ¡Disfruta Arch Linux!"
+echo "Ya puedes reiniciar. ¡Bienvenido a Arch Linux en español 🇲🇽!"

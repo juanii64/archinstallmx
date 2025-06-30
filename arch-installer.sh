@@ -1,11 +1,10 @@
 #!/bin/bash
-
 set -e
 
 echo "========== INSTALADOR DE ARCH LINUX =========="
 echo
 
-# Pausa
+# Función para pausar
 pause() {
   read -rp "Presiona Enter para continuar..."
 }
@@ -39,7 +38,7 @@ echo "[⚠️] ¡Se formateará el disco completo: $DISK!"
 read -rp "¿Deseas continuar? (y/N): " CONFIRM
 [[ $CONFIRM != "y" ]] && exit 1
 
-# Comenzar particionado
+# Limpiar y crear tabla
 echo "[8] Limpiando tabla de particiones..."
 wipefs -af "$DISK"
 sgdisk -Zo "$DISK"
@@ -50,38 +49,42 @@ else
   parted "$DISK" --script mklabel msdos
 fi
 
-# Crear particiones con tamaño personalizado
-read -rp "[9] Tamaño para la raíz / (ej. 20G). Deja vacío o 0 para usar el resto: " ROOTSIZE
-if [[ $ROOTSIZE == "" || $ROOTSIZE == "0" ]]; then
-  ROOTSIZE="100%"  # Usar todo el disco o lo que quede
-else
-  ROOTSIZE="${ROOTSIZE}GiB"
-fi
-
+# Crear particiones
 PART_COUNT=1
 
 if [[ $BOOTMODE == "UEFI" ]]; then
-  read -rp "Tamaño para /boot/efi (recomendado: 512M): " EFISIZE
+  read -rp "Tamaño para /boot/efi (ej. 512MiB, default): " EFISIZE
   EFISIZE=${EFISIZE:-512MiB}
   parted "$DISK" --script mkpart primary fat32 1MiB "$EFISIZE"
   parted "$DISK" --script set ${PART_COUNT} esp on
   BOOT="${DISK}${PART_COUNT}"
   ((PART_COUNT++))
+  EFI_END="$EFISIZE"
+else
+  EFI_END="1MiB"
 fi
 
-parted "$DISK" --script mkpart primary ext4 ${EFISIZE:-1MiB} "$ROOTSIZE"
+read -rp "Tamaño para la raíz / (ej. 20G). Deja vacío o 0 para usar el resto: " ROOTSIZE
+if [[ $ROOTSIZE == "" || $ROOTSIZE == "0" ]]; then
+  ROOT_END="100%"
+else
+  ROOT_END="${ROOTSIZE}GiB"
+fi
+
+parted "$DISK" --script mkpart primary ext4 "$EFI_END" "$ROOT_END"
 ROOT="${DISK}${PART_COUNT}"
 ((PART_COUNT++))
 
 if [[ $HOMEPART == "Sí" ]]; then
-  parted "$DISK" --script mkpart primary ext4 "$ROOTSIZE" 100%
+  parted "$DISK" --script mkpart primary ext4 "$ROOT_END" 100%
   HOME="${DISK}${PART_COUNT}"
 fi
 
 sync
 sleep 1
 
-echo "[10] Formateando particiones..."
+# Formatear y montar
+echo "[9] Formateando y montando particiones..."
 mkfs.ext4 "$ROOT"
 mount "$ROOT" /mnt
 
@@ -97,13 +100,17 @@ if [[ $HOMEPART == "Sí" ]]; then
   mount "$HOME" /mnt/home
 fi
 
-echo "[11] Instalando base del sistema..."
+# Instalar base
+echo "[10] Instalando el sistema base..."
 pacstrap /mnt base linux linux-firmware nano sudo networkmanager grub
 
-echo "[12] Generando fstab..."
+# Fstab
+echo "[11] Generando fstab..."
 genfstab -U /mnt >> /mnt/etc/fstab
 
-echo "[13] Configurando sistema..."
+# Configurar dentro de chroot
+echo "[12] Configurando el sistema dentro de chroot..."
+
 arch-chroot /mnt /bin/bash <<EOF
 ln -sf /usr/share/zoneinfo/America/Mexico_City /etc/localtime
 hwclock --systohc
@@ -136,8 +143,9 @@ fi
 grub-mkconfig -o /boot/grub/grub.cfg
 EOF
 
-echo "[✅] Instalación completada correctamente."
+# Finalizar
+echo "[✅] Instalación completada exitosamente."
 echo "Desmontando particiones..."
 umount -R /mnt
 
-echo "Ya puedes reiniciar. ¡Disfruta tu Arch Linux!"
+echo "Ya puedes reiniciar. ¡Bienvenido a Arch Linux!"

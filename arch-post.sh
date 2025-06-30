@@ -76,7 +76,7 @@ instalar_fuentes() {
 
 habilitar_servicios() {
     echo -e "${verde}Selecciona servicios para habilitar:${reset}"
-    servicios=(bluetooth tlp cups avahi)
+    servicios=(bluetooth)
     for srv in "${servicios[@]}"; do
         read -rp "¿Habilitar $srv.service? [y/N]: " resp
         if [[ $resp == "y" || $resp == "Y" ]]; then

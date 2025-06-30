@@ -55,7 +55,7 @@ instalar_yay() {
 
 instalar_utiles() {
     echo -e "${verde}Instalando herramientas comunes...${reset}"
-    sudo pacman -S --noconfirm nano git curl wget unzip neofetch htop reflector
+    sudo pacman -S --noconfirm base base-devel nano git curl wget unzip fastfetch htop btop reflector
 }
 
 configurar_shell() {

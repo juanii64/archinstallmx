@@ -39,32 +39,39 @@ Antes de ejecutar el script, asegúrate de:
     cd archinstallmx
     ```
 
-7. **Ejecutar el instalador:**
+7. **Ejecutar el script principal o el post-instalador:**
     ```bash
-    sh arch-installer.sh
+    sh arch-installer.sh      # Para instalar el sistema
+
+    # o, después del reinicio:
+    sh arch-post.sh           # Repite los pasos previos hasta clonar el repositorio
     ```
 
 ---
 
 ## 🧠 ¿Qué hace el script?
 
+### arch-installer.sh
+
 - Muestra los discos disponibles y permite elegir con menú numérico.
 - Realiza particionado en modo UEFI (GPT):
   - Partición EFI (1 GiB)
-  - Partición raíz `/` con el resto del disco
+  - Partición raíz `/` con el resto del disco.
 - Formatea y monta dichas particiones.
 - Instala el sistema base: kernel, firmware, GRUB, NetworkManager, etc.
 - Configura idioma (`es_MX.UTF-8`), zona horaria, hostname, usuario y contraseña.
 - Instala y configura GRUB en UEFI, incluyendo fallback.
 - Activa NetworkManager para conexión al primer reinicio.
 
----
+### arch-post.sh
 
-## ❗ Qué NO hace
-
-- No instala entorno gráfico (GNOME, KDE, XFCE…)
-- No crea partición `/home` separada
-- No instala software adicional (editores, navegadores, etc.)
+1. Instalar entorno gráfico.
+2. Instalar yay.
+3. Instalar herramientas comunes.
+4. Configurar shell (bash, zsh o fish).
+5. Instalar fuentes.
+6. Instalar servicios como bluetooth (próximamente se añadirán más).
+7. Salir.
 
 ---
 
@@ -75,6 +82,10 @@ Este proyecto está licenciado bajo [GNU General Public License v3.0](https://ww
 ---
 
 ## 📌 Enlace del repositorio
+
+Desarrollado por juanii64, amante de linux para linuxeros.
+
+I USE ARCH BTW.
 
 [https://github.com/juanii64/archinstallmx](https://github.com/juanii64/archinstallmx)
 

@@ -1,7 +1,7 @@
 # 🖥️ archinstallmx
 
 **Script automatizado para instalar Arch Linux en modo UEFI con configuración en español (México).**  
-Realiza una instalación limpia, rápida y mínima de Arch Linux, sin partición `/home` separada, con soporte para GRUB y NetworkManager.
+Realiza una instalación limpia, rápida y mínima de Arch Linux, con soporte para GRUB y NetworkManager.
 
 ---
 

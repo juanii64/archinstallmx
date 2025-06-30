@@ -1,7 +1,9 @@
 #!/bin/bash
+
+# Arch Linux Install Script (por juanii64)
 set -e
 
-echo "========== INSTALADOR DE ARCH LINUX (UEFI / sin /home / español MX) =========="
+echo "========== INSTALADOR DE ARCH LINUX (UEFI) Script (por juanii64) =========="
 
 # Mostrar discos como menú numerado
 echo "[1] Discos disponibles:"

@@ -4,6 +4,8 @@
 
 set -e
 
+echo "========== INSTALADOR DE ARCH LINUX (UEFI) Script (por juanii64) =========="
+
 # ---- COLORES ----
 verde="\e[32m"
 rojo="\e[31m"

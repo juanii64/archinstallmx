@@ -54,7 +54,7 @@ mount "$BOOT" /mnt/boot/efi
 
 # Instalación base con efibootmgr
 echo "[10] Instalando el sistema base..."
-pacstrap /mnt base linux linux-firmware nano sudo networkmanager grub efibootmgr
+pacstrap /mnt base linux linux-firmware nano sudo networkmanager grub efibootmgr iwd
 
 # Fstab
 genfstab -U /mnt >> /mnt/etc/fstab
